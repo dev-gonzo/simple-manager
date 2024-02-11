@@ -1,0 +1,191 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Usuários do sistema
+model User {
+  id       String   @id @default(uuid())
+  username String   @unique
+  password String
+  role     UserRole // Papel do usuário no sistema
+  person   Person?  @relation(fields: [personId], references: [id]) // Pessoa física relacionada ao usuário
+  personId String? // Id da pessoa física relacionada ao usuário
+}
+
+// Pessoas físicas
+model Person {
+  id         String     @id @default(uuid())
+  firstName  String
+  lastName   String
+  email      String?    @unique
+  cpf        String?    @unique
+  businesses Business[] @relation("PersonBusiness") // Empresas relacionadas à pessoa física
+  suppliers  Supplier[] @relation("PersonSupplier") // Fornecedores relacionados à pessoa física
+  User       User[]
+}
+
+// Empresas
+model Business {
+  id          String       @id @default(uuid())
+  companyName String?      @map(name: "company_name")
+  tradeName   String?      @map(name: "trade_name")
+  cnpj        String?      @unique
+  stateReg    String?      @map(name: "state_registration")
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?      @map(name: "zip_code")
+  isSupplier  Boolean      @default(true) // Indica se a empresa é um fornecedor
+  type        BusinessType // Tipo de empresa
+  employees   Person[]     @relation("PersonBusiness") // Pessoas físicas vinculadas à empresa
+  suppliers   Supplier[]   @relation("BusinessSupplier") // Fornecedores relacionados à empresa
+}
+
+// Fornecedores
+model Supplier {
+  id              String            @id @default(uuid())
+  name            String
+  type            SupplierType
+  person          Person?           @relation("PersonSupplier", fields: [personId], references: [id])
+  business        Business?         @relation("BusinessSupplier", fields: [businessId], references: [id])
+  personId        String? // Id da pessoa física relacionada ao fornecedor
+  businessId      String? // Id da empresa relacionada ao fornecedor
+  SupplierContact SupplierContact[] // Contatos do fornecedor
+}
+
+// Tipos de usuário
+enum UserRole {
+  ADMIN
+  USER
+}
+
+// Tipos de empresa
+enum BusinessType {
+  COMPANY
+  PROVIDER
+}
+
+// Tipos de fornecedor
+enum SupplierType {
+  MATERIAL
+  SERVICE
+}
+
+// Contatos do fornecedor
+model SupplierContact {
+  id          String   @id @default(uuid())
+  supplier    Supplier @relation(fields: [supplierId], references: [id])
+  supplierId  String   @map(name: "supplier_id")
+  email       String?
+  phoneNumber String?
+}
+
+// Ingredientes
+model Ingredient {
+  id                 String               @id @default(uuid())
+  name               String
+  IngredientMovement IngredientMovement[]
+}
+
+// Movimentações de ingredientes
+model IngredientMovement {
+  id           String       @id @default(uuid())
+  ingredient   Ingredient   @relation(fields: [ingredientId], references: [id])
+  ingredientId String       @map(name: "ingredient_id")
+  type         MovementType
+  quantity     Float
+  price        Float?
+  origin       String?
+  createdAt    DateTime     @default(now())
+}
+
+// Unidades de medida
+model UnitOfMeasure {
+  id                   String          @id @default(uuid())
+  name                 String
+  abbreviation         String
+  isLargerThanStandard Boolean?
+  conversionFactor     Float? // Fator de conversão em relação à unidade de medida padrão
+  equivalence          String? // Equivalência do cálculo
+  standardUnit         UnitOfMeasure?  @relation("StandardUnit", fields: [standardUnitId], references: [id])
+  standardUnitId       String? // Id da unidade de medida padrão
+  referencedBy         UnitOfMeasure[] @relation("StandardUnit") // Adicionando relação oposta
+}
+
+// Gerencia os produtos e suas características
+model Product {
+  id          String      @id @default(uuid())
+  name        String
+  description String
+  variations  Variation[]
+  components  Component[] @relation("ProductComponents")
+  Movement    Movement[]
+
+  @@map("product")
+}
+
+// Variações de um produto, como tamanho, cor, etc.
+model Variation {
+  id        String     @id @default(uuid())
+  name      String?
+  groupId   String?
+  group     Group?     @relation(fields: [groupId], references: [id], name: "VariationGroups")
+  productId String
+  product   Product    @relation(fields: [productId], references: [id])
+  sku       String
+  price     Float?
+  stock     Int?
+  Movement  Movement[]
+
+  @@map("variation")
+}
+
+// Grupos de variações, como "Tamanho", "Cor", etc.
+model Group {
+  id         String      @id @default(uuid())
+  name       String
+  variations Variation[] @relation("VariationGroups")
+
+  @@map("group")
+}
+
+// Componentes de um produto, se houver
+model Component {
+  id        String  @id @default(uuid())
+  product   Product @relation(fields: [productId], references: [id], name: "ProductComponents")
+  quantity  Int
+  productId String  @map(name: "product_id")
+
+  @@map("component")
+}
+
+// Movimentações relacionadas aos produtos
+model Movement {
+  id              String       @id @default(uuid())
+  productId       String       @map(name: "product_id")
+  product         Product      @relation(fields: [productId], references: [id])
+  variationId     String?      @map(name: "variation_id")
+  variation       Variation?   @relation(fields: [variationId], references: [id])
+  type            MovementType
+  quantity        Int
+  price           Float
+  productSnapshot Json
+  origin          String?
+  createdAt       DateTime     @default(now())
+
+  @@map("movement")
+}
+
+// Tipos de movimentação
+enum MovementType {
+  IN
+  OUT
+}
