@@ -8,9 +8,10 @@ import { NextResponse, NextRequest } from "next/server";
 
 export async function GET(req: any, res: any) {
     const session = await getServerSession();
+    const teste = process?.env?.GOOGLE_CLIENT_ID;
 
     if (!session) {
-      return NextResponse.json({ message: "You must be logged in." }, {status: 401});
+      return NextResponse.json({ message: `NEw You must be logged in. ${teste}` }, {status: 401});
     }
   
     return NextResponse.json(session, { status: 201})
